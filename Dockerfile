@@ -1,14 +1,10 @@
-ARG image_user=amd64
-ARG image_repo=debian
-ARG image_tag=buster
-
-FROM ${image_user}/${image_repo}:${image_tag} as volttron_base
+FROM ubuntu:18.04 as volttron_base
 
 SHELL [ "bash", "-c" ]
 
 ENV OS_TYPE=debian
 ENV DIST=buster
-ENV VOLTTRON_GIT_BRANCH=rabbitmq-volttron
+ENV VOLTTRON_GIT_BRANCH=develop
 ENV VOLTTRON_USER_HOME=/home/volttron
 ENV VOLTTRON_HOME=${VOLTTRON_USER_HOME}/.volttron
 ENV CODE_ROOT=/code
@@ -21,6 +17,7 @@ ENV RMQ_HOME=${RMQ_ROOT}/rabbitmq_server-3.7.7
 # --no-install-recommends \
 USER root
 RUN set -eux; apt-get update; apt-get install -y --no-install-recommends \
+    apt-utils \
     procps \
     gosu \
     vim \
@@ -38,8 +35,7 @@ RUN set -eux; apt-get update; apt-get install -y --no-install-recommends \
     apt-transport-https \
     wget \
     curl \
-    ca-certificates \
-    libffi-dev
+    ca-certificates
 
 
 RUN id -u $VOLTTRON_USER &>/dev/null || adduser --disabled-password --gecos "" $VOLTTRON_USER
@@ -61,11 +57,12 @@ FROM volttron_base AS volttron_core
 USER $VOLTTRON_USER
 
 # The following lines ar no longer necesary because of the copy command above.
-#WORKDIR /code
-#RUN git clone https://github.com/VOLTTRON/volttron -b ${VOLTTRON_GIT_BRANCH}
-COPY --chown=volttron:volttron volttron /code/volttron
+WORKDIR /code
+RUN git clone https://github.com/VOLTTRON/volttron -b ${VOLTTRON_GIT_BRANCH}
+#COPY --chown=volttron:volttron volttron /code/volttron
 
 WORKDIR /code/volttron
+RUN pip3 install wheel
 RUN pip3 install -e . --user
 RUN echo "package installed at `date`"
 
@@ -73,7 +70,7 @@ RUN echo "package installed at `date`"
 # RABBITMQ SPECIFIC INSTALLATION
 ############################################
 USER root
-RUN ./scripts/rabbit_dependencies.sh $OS_TYPE $DIST
+RUN ./scripts/rabbit_dependencies.sh debian bionic
 
 RUN mkdir /startup $VOLTTRON_HOME && \
     chown $VOLTTRON_USER.$VOLTTRON_USER $VOLTTRON_HOME
